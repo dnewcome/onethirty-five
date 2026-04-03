@@ -209,17 +209,25 @@ body::before{
   </div>
 
   <div class="sec">
-    <div class="sec-lbl">Experiments</div>
-    <div class="toggle-row">
-      <div>
-        <div class="toggle-lbl">Golden angle spacing</div>
-        <div class="toggle-sub">137.5° between generators</div>
-      </div>
-      <label class="switch">
-        <input type="checkbox" id="tog-golden">
-        <span class="slider"></span>
-      </label>
+    <div class="sec-lbl">Azimuthal Spacing</div>
+    <div class="bgrp" style="margin-bottom:8px">
+      <button class="tbtn active" data-az="equal">Equal</button>
+      <button class="tbtn" data-az="golden">Golden</button>
+      <button class="tbtn" data-az="silver">Silver</button>
+      <button class="tbtn" data-az="custom">Free</button>
     </div>
+    <div class="cr" id="az-row">
+      <div class="clr">
+        <span class="cn">Angle step</span>
+        <span class="cv" id="v-az">137.5°</span>
+      </div>
+      <input type="range" id="c-az" min="1" max="359" step="0.1" value="137.5">
+    </div>
+    <div style="font-size:8px;color:var(--t0);margin-top:6px;font-style:italic;line-height:1.6" id="az-note">360°/N — true rhombic zonohedron</div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Experiments</div>
     <div class="toggle-row">
       <div>
         <div class="toggle-lbl">Variable elevation</div>
@@ -277,7 +285,8 @@ const S = {
   dome: true,     // dome (top half) | full zonohedron
   disp: 'solid',  // solid | wire | both
   col: 'zone',    // zone | depth | flat
-  golden: false,
+  azMode: 'equal',  // equal | custom
+  azAngle: 137.5,   // step angle in degrees when not equal
   varphi: false,
   varlen: false,
 };
@@ -348,11 +357,13 @@ let faceNormals   = [];
 
 // ─── Generator Construction ───────────────────────────────────────────────────
 
-function buildGenerators(N, phi_deg, golden, varphi, varlen) {
+const SILVER_ANGLE = 360 * (Math.sqrt(2) - 1); // ≈ 149.086°
+
+function buildGenerators(N, phi_deg, azMode, azAngle, varphi, varlen) {
   const g = [];
   for (let k = 0; k < N; k++) {
     // Azimuthal angle
-    const az_deg = golden ? k * GOLDEN_ANGLE : k * 360 / N;
+    const az_deg = azMode === 'equal' ? k * 360 / N : k * azAngle;
     const az = az_deg * Math.PI / 180;
 
     // Elevation angle
@@ -477,7 +488,7 @@ function rebuild() {
 
   const { N, phi, scale, disp, col, golden, varphi, varlen } = S;
 
-  generators = buildGenerators(N, phi, golden, varphi, varlen);
+  generators = buildGenerators(N, phi, S.azMode, S.azAngle, varphi, varlen);
   const { geo, centroids, fNormals: fN } = buildZonohedron(generators, scale, col, S.dome);
   faceCentroids = centroids;
   faceNormals   = fN;
@@ -546,9 +557,7 @@ function updateStats() {
 }
 
 function checkRhombic() {
-  // Check if all faces are rhombuses (equal-length sides)
-  // True for standard polar zonohedron (equal azimuthal spacing, equal elevation, equal length)
-  const isStandard = !S.golden && !S.varphi && !S.varlen;
+  const isStandard = S.azMode === 'equal' && !S.varphi && !S.varlen;
   document.getElementById('st-rhomb').textContent = isStandard ? 'yes' : 'approx';
   document.getElementById('st-rhomb').style.color = isStandard ? 'var(--teal)' : 'var(--gold)';
 }
@@ -711,8 +720,61 @@ function initUI() {
       rebuild();
     }));
 
+  // Azimuthal spacing
+  const NAMED_AZ = {
+    golden: GOLDEN_ANGLE,
+    silver: SILVER_ANGLE,
+  };
+  const AZ_NOTES = {
+    equal:  `360°/N — true rhombic zonohedron`,
+    golden: `${GOLDEN_ANGLE.toFixed(3)}° — golden angle (phyllotaxis)`,
+    silver: `${SILVER_ANGLE.toFixed(3)}° — silver ratio derived`,
+    custom: 'free angle step',
+  };
+
+  function updateAzUI(label) {
+    const isEqual = S.azMode === 'equal';
+    const row = document.getElementById('az-row');
+    row.style.opacity = isEqual ? '0.3' : '1';
+    row.style.pointerEvents = isEqual ? 'none' : 'auto';
+    document.getElementById('az-note').textContent = AZ_NOTES[label || S.azMode] || '';
+    document.getElementById('v-az').textContent = S.azAngle.toFixed(1) + '°';
+    document.getElementById('c-az').value = S.azAngle;
+  }
+
+  document.querySelectorAll('[data-az]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      const az = btn.dataset.az;
+      document.querySelectorAll('[data-az]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      if (az === 'equal') {
+        S.azMode = 'equal';
+      } else if (az in NAMED_AZ) {
+        S.azMode = 'custom';
+        S.azAngle = NAMED_AZ[az];
+      } else {
+        S.azMode = 'custom';
+      }
+      updateAzUI(az);
+      rebuild();
+    }));
+
+  document.getElementById('c-az').addEventListener('input', e => {
+    S.azAngle = +e.target.value;
+    S.azMode = 'custom';
+    document.getElementById('v-az').textContent = S.azAngle.toFixed(1) + '°';
+    // Snap label to nearest named angle within 0.2°
+    const nearest = Object.entries(NAMED_AZ).find(([, v]) => Math.abs(v - S.azAngle) < 0.2);
+    const label = nearest ? nearest[0] : 'custom';
+    document.querySelectorAll('[data-az]').forEach(b =>
+      b.classList.toggle('active', b.dataset.az === label));
+    document.getElementById('az-note').textContent = AZ_NOTES[label] || AZ_NOTES.custom;
+    rebuild();
+  });
+
+  updateAzUI('equal');
+
   // Toggle switches
-  document.getElementById('tog-golden').addEventListener('change', e => { S.golden = e.target.checked; rebuild(); });
   document.getElementById('tog-varphi').addEventListener('change', e => { S.varphi = e.target.checked; rebuild(); });
   document.getElementById('tog-varlen').addEventListener('change', e => { S.varlen = e.target.checked; rebuild(); });
 
