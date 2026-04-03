@@ -20,8 +20,11 @@ The core idea: place seed element *i* at angle `i × φ` and radius `√i × sca
 the full range of botanical forms.
 
 **Features**
-- Four growth modes: flat disk (sunflower), tapered cone (pinecone), cylinder (pineapple), fern frond
-- Four seed primitives: sphere, cone, box, tetrahedron
+- Five growth modes: flat disk (sunflower), tapered cone (pinecone), cylinder (pineapple),
+  fern frond, and **STL surface** — projects the phyllotaxis spiral onto an imported mesh
+- Four built-in seed primitives: sphere, cone, box, tetrahedron
+- **Custom STL seed geometry** — import any STL to use as the seed element; normalized
+  to unit size so existing size slider still controls scale
 - Animated growth — seeds appear one by one with spring easing
 - Live controls: golden angle (90–180°), seed count, radius, height step, taper, size
 - Three color modes: single, gradient (A→B by index), rainbow
@@ -29,6 +32,16 @@ the full range of botanical forms.
   Fibonacci spiral families for the current N and angle
 - Presets: Sunflower / Pinecone / Pineapple / Fern
 - OrbitControls (drag to rotate, scroll to zoom)
+
+**STL surface mode**
+
+Load any closed STL mesh as the growth surface. Seeds are distributed using a Fibonacci
+sphere (equal-area projection), and for each seed a ray is cast outward from the shape's
+center to find the surface intersection. Seeds are placed at those points and oriented
+along the surface normal — so they always point outward from the imported shape regardless
+of its geometry. Works well for convex and mildly concave shapes (hearts, faces, vases,
+architectural forms). The golden angle slider still controls the phyllotaxis distribution
+pattern on the surface.
 
 **The golden angle**
 
@@ -80,13 +93,10 @@ See [`PLAN.md`](PLAN.md) for the full roadmap, including:
 
 - STL and PLY mesh export from the phyllotaxis visualizer
 - Point cloud export (XYZ/PLY with normals) for fixture placement workflows
-- Custom STL seed geometry import — replace built-in primitives with arbitrary shapes
-- Surface-mapped phyllotaxis — project the spiral onto an imported target mesh
-  (a heart, a face scan, any organic form)
 - Developable surface panels — unroll the phyllotaxis cone into flat cut patterns
   for laser cutting / fabrication (the Fibonacci spiral arms become straight lines
   on the unrolled sector)
-- Zome geometry additions to PLAN.md pending
+- Zome zone line visualization and structural rigidity analysis
 
 ---
 

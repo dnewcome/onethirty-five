@@ -116,7 +116,7 @@ const normal = new THREE.Vector3(0, 1, 0).applyQuaternion(seed.quat);
 
 ---
 
-## 3. Custom STL Seed Geometry (Import)
+## 3. Custom STL Seed Geometry (Import) ✓
 
 **Goal:** Replace the built-in primitives (sphere, box, cone, tetra) with a user-supplied
 STL file. This allows custom seed shapes — a diamond, a leaf, an architectural element,
@@ -159,7 +159,7 @@ geo.scale(1/size, 1/size, 1/size);
 
 ---
 
-## 4. Surface-Mapped Phyllotaxis
+## 4. Surface-Mapped Phyllotaxis ✓ (Approach A)
 
 **Goal:** Import an arbitrary mesh surface (e.g., a heart, a sphere, a face scan) and
 map the phyllotaxis spiral onto it — so seeds grow across the surface of that shape
@@ -427,15 +427,15 @@ strips.
 
 ## Implementation Priority
 
-| Feature | Complexity | Value | Priority |
+| Feature | Complexity | Value | Status |
 |---|---|---|---|
-| STL export | Low | High | 1 |
-| XYZ / PLY point cloud export | Low | High | 2 |
-| Custom STL seed import | Medium | High | 3 |
-| Surface mapping (projection) | Medium | High | 4 |
-| Developable cone panels (SVG) | Medium | Very High | 5 |
-| UV-space surface mapping | High | Medium | 6 |
-| True MeshSurfaceSampler mapping | High | Medium | 7 |
+| STL export | Low | High | — |
+| XYZ / PLY point cloud export | Low | High | — |
+| Custom STL seed import | Medium | High | ✓ done |
+| Surface mapping (projection) | Medium | High | ✓ done (Approach A) |
+| Developable cone panels (SVG) | Medium | Very High | — |
+| UV-space surface mapping | High | Medium | — |
+| True MeshSurfaceSampler mapping | High | Medium | — |
 
 Features 1–3 are all self-contained additions to `phyllotaxis.html`.  
 Feature 4 (surface mapping) could be a separate page `surface.html`.  

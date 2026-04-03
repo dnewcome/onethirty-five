@@ -15,9 +15,9 @@
   --panel:#0c0d15;
   --b1:#1a2030;
   --b2:#252f45;
-  --t0:#3d4a60;
-  --t1:#6b7894;
-  --t2:#9ba8bf;
+  --t0:#6070a0;
+  --t1:#a0b0cc;
+  --t2:#c8d4e8;
   --gold:#d4a843;
   --gold-d:#8a6c2a;
   --teal:#4aeabc;
@@ -221,9 +221,15 @@ body::before{
     <div class="bgrp">
       <button class="tbtn" data-mode="flat">Flat</button>
       <button class="tbtn active" data-mode="cone">Cone</button>
-      <button class="tbtn" data-mode="cylinder">Cylinder</button>
+      <button class="tbtn" data-mode="cylinder">Cyl</button>
       <button class="tbtn" data-mode="fern">Fern</button>
+      <button class="tbtn" data-mode="stl">STL</button>
     </div>
+    <label class="abtn" style="margin-top:9px;margin-bottom:0;cursor:pointer">
+      <span class="dot"></span>
+      <span id="shape-stl-name">Load shape STL…</span>
+      <input type="file" id="shape-stl-input" accept=".stl" style="display:none">
+    </label>
   </div>
 
   <div class="sec">
@@ -234,6 +240,11 @@ body::before{
       <button class="tbtn active" data-shape="box">Box</button>
       <button class="tbtn" data-shape="tetra">Tetra</button>
     </div>
+    <label class="abtn" style="margin-top:9px;margin-bottom:0;cursor:pointer">
+      <span class="dot"></span>
+      <span id="stl-name">Load STL…</span>
+      <input type="file" id="stl-input" accept=".stl" style="display:none">
+    </label>
   </div>
 
   <div class="sec">
@@ -278,6 +289,7 @@ body::before{
 <script type="module">
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLLoader } from 'three/addons/loaders/STLLoader.js';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -291,10 +303,12 @@ const S = {
   mode: 'cone', shape: 'box', size: 0.38,
   col: 'gradient', col1: '#c8862a', col2: '#2a1208',
   fib: true, spd: 20,
+  customGeo: null,
 };
 
 let growProg = 0, isGrowing = false, isPaused = false;
 let positions = []; // precomputed [{x,y,z,quat,scale}]
+let shapeMesh = null; // target mesh for STL surface mapping
 
 // ─── ThreeJS ──────────────────────────────────────────────────────────────────
 
@@ -360,6 +374,7 @@ let mesh = null;
 let fibGroup = null;
 
 function makeGeo(shape) {
+  if (S.customGeo) return S.customGeo.clone();
   switch (shape) {
     case 'sphere': return new THREE.SphereGeometry(0.5, 9, 7);
     case 'cone':   return new THREE.ConeGeometry(0.38, 0.82, 6);
@@ -402,6 +417,40 @@ function computePositions() {
   const rad_ = angle * Math.PI / 180;
   const out = [];
   const up = new THREE.Vector3(0, 1, 0);
+
+  // ── STL surface mapping ────────────────────────────────────────────────────
+  if (mode === 'stl') {
+    if (!shapeMesh) {
+      for (let i = 0; i < n; i++)
+        out.push({ x: 0, y: -9999, z: 0, quat: new THREE.Quaternion(), sc: 0 });
+      return out;
+    }
+    shapeMesh.updateMatrixWorld();
+    const raycaster = new THREE.Raycaster();
+    const FAR = 20;
+    for (let i = 0; i < n; i++) {
+      const theta = i * rad_;
+      const phi = Math.acos(1 - 2 * (i + 0.5) / n);
+      const dir = new THREE.Vector3(
+        Math.sin(phi) * Math.cos(theta),
+        Math.cos(phi),
+        Math.sin(phi) * Math.sin(theta)
+      );
+      // cast from outside inward so we hit front faces with correct outward normals
+      raycaster.set(dir.clone().multiplyScalar(FAR), dir.clone().negate());
+      const hits = raycaster.intersectObject(shapeMesh);
+      if (hits.length > 0) {
+        const hit = hits[0];
+        const normal = hit.face.normal.clone().transformDirection(shapeMesh.matrixWorld);
+        const quat = new THREE.Quaternion();
+        if (normal.lengthSq() > 0.0001) quat.setFromUnitVectors(up, normal.normalize());
+        out.push({ x: hit.point.x, y: hit.point.y, z: hit.point.z, quat, sc: 1.0 });
+      } else {
+        out.push({ x: 0, y: -9999, z: 0, quat: new THREE.Quaternion(), sc: 0 });
+      }
+    }
+    return out;
+  }
 
   for (let i = 0; i < n; i++) {
     const a = i * rad_;
@@ -571,6 +620,55 @@ function updateFibUI() {
   document.getElementById('fibr').textContent = (f2 / f1).toFixed(5);
   document.getElementById('hud-f1').textContent = f1;
   document.getElementById('hud-f2').textContent = f2;
+}
+
+// ─── STL Import ───────────────────────────────────────────────────────────────
+
+function loadSTLFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const geo = new STLLoader().parse(e.target.result);
+    geo.computeBoundingBox();
+    const center = new THREE.Vector3();
+    geo.boundingBox.getCenter(center);
+    const size = geo.boundingBox.getSize(new THREE.Vector3()).length();
+    geo.translate(-center.x, -center.y, -center.z);
+    geo.scale(1 / size, 1 / size, 1 / size);
+    if (S.customGeo) S.customGeo.dispose();
+    S.customGeo = geo;
+    S.shape = 'custom';
+    document.querySelectorAll('[data-shape]').forEach(b => b.classList.remove('active'));
+    document.getElementById('stl-name').textContent = file.name.replace(/\.stl$/i, '');
+    rebuildMesh();
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ─── Shape STL Import ─────────────────────────────────────────────────────────
+
+function loadShapeSTL(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    const geo = new STLLoader().parse(e.target.result);
+    geo.computeBoundingBox();
+    const center = new THREE.Vector3();
+    geo.boundingBox.getCenter(center);
+    const size = geo.boundingBox.getSize(new THREE.Vector3()).length();
+    geo.translate(-center.x, -center.y, -center.z);
+    geo.scale(8 / size, 8 / size, 8 / size);
+    if (shapeMesh) shapeMesh.geometry.dispose();
+    shapeMesh = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ side: THREE.FrontSide }));
+    shapeMesh.updateMatrixWorld();
+    S.mode = 'stl';
+    document.querySelectorAll('[data-mode]').forEach(b =>
+      b.classList.toggle('active', b.dataset.mode === 'stl'));
+    document.getElementById('shape-stl-name').textContent = file.name.replace(/\.stl$/i, '');
+    camTo.set(0, 4, 16);
+    lookTo.set(0, 0, 0);
+    camLerp = 1;
+    recompute();
+  };
+  reader.readAsArrayBuffer(file);
 }
 
 // ─── Recompute ────────────────────────────────────────────────────────────────
@@ -765,11 +863,25 @@ function initUI() {
   // Shape
   document.querySelectorAll('[data-shape]').forEach(btn =>
     btn.addEventListener('click', () => {
+      if (S.customGeo) { S.customGeo.dispose(); S.customGeo = null; }
+      document.getElementById('stl-name').textContent = 'Load STL…';
       S.shape = btn.dataset.shape;
       document.querySelectorAll('[data-shape]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       rebuildMesh();
     }));
+
+  // STL seed import
+  document.getElementById('stl-input').addEventListener('change', e => {
+    if (e.target.files[0]) loadSTLFile(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  // STL shape import
+  document.getElementById('shape-stl-input').addEventListener('change', e => {
+    if (e.target.files[0]) loadShapeSTL(e.target.files[0]);
+    e.target.value = '';
+  });
 
   // Color mode
   document.querySelectorAll('[data-col]').forEach(btn =>

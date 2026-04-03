@@ -1,0 +1,12 @@
+[project]
+uuid = "a8bdb8a1-cd1e-493d-ada8-430063773148"
+name = "onethirty-five"
+description = "3D visualization experiments based on the 137.5° golden angle — phyllotaxis spiral growth and polar zonohedron geometry."
+
+[publish]
+devlog_tag = "onethirty-five"
+devlog_dest = "../dnuke.com/src/blog/posts"
+
+[devlog]
+version = "v1.0"
+source = "https://github.com/dnewcome/devlog-tools"
