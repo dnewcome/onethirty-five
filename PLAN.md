@@ -287,6 +287,144 @@ This alone is a complete, self-contained fabrication pipeline.
 
 ---
 
+---
+
+## 6. Zome Zone Line Visualization
+
+**Goal:** Display the N continuous helical paths that zone edges trace across the dome
+surface, rather than showing them as individual short edges. Makes the spiral structure
+of the zonohedron immediately legible and helps evaluate fabrication approaches.
+
+### What zone lines are
+
+In a polar zonohedron each generator g_k defines a **zone** — a set of N parallel edges
+(one per face column i) that wind around the dome in a helix. Rendered as a continuous
+polyline per zone, these look like the spiral arms of phyllotaxis mapped onto the dome
+surface.
+
+### Implementation
+
+For zone m, the N vertices in order are `V(i, m−i mod N)` for i = 0..N−1, each
+connected to the next by an edge parallel to g_m. Build as a THREE.Line per zone,
+colored by zone index.
+
+### Display options
+
+- Show all N zone lines (one color per zone, matching zone band colors)
+- Highlight just the two Fibonacci families (F₁ and F₂ zone lines) — most relevant
+  to the phyllotaxis connection
+- Toggle: thick lines vs thin, opacity control
+- Show planarity deviation: color each zone line segment by how far it deviates from
+  the best-fit plane through that zone's vertices — quantifies how "flat-strip-achievable"
+  each zone line is
+
+---
+
+## 7. Structural Rigidity — Triangulation and Fabrication
+
+**Goal:** Understand and visualize the rigidity (or lack thereof) of the zonohedron as
+a pole-and-joint structure, and provide tools for designing buildable physical versions.
+
+### The rigidity problem
+
+A polar zonohedron made of poles and pin joints is **not self-supporting**. Every
+rhombic face has one degree of freedom (parallelogram shear), giving the structure
+N(N−1) internal mechanisms.
+
+Maxwell's rule for 3D frames: `m = 3j − 6` for a just-rigid (isostatic) structure.
+
+```
+For N=12 full zonohedron:
+  faces    = N(N−1)      = 132
+  vertices = N(N−1) + 2  = 134
+  edges    = 2·N(N−1)    = 264
+
+  3j − 6 = 3(134) − 6   = 396
+  deficit = 264 − 396    = −132  ← 132 mechanisms
+```
+
+Adding one diagonal per face brings m exactly to 3j−6, and Cauchy's rigidity theorem
+guarantees the convex triangulated result is rigid.
+
+### Triangulation diagonal display
+
+Toggle to show one diagonal per rhombic face — the minimal bracing needed to make the
+structure rigid. Two choices per face:
+
+- **Short diagonal** — connects acute-angle vertices (shorter, steeper)
+- **Long diagonal** — connects obtuse-angle vertices (longer, shallower)
+
+Consistent choice across all faces gives one global triangulation. Alternating gives a
+herringbone pattern. Both are exactly isostatic; they have different aesthetic and
+structural properties (the short diagonal is more efficient in compression-dominant
+loads, the long diagonal in tension).
+
+Export: include selected diagonals in STL/OBJ output as thin rod geometry, or as a
+separate edge list for fabrication.
+
+### Approaches to rigidity without full triangulation
+
+**1. Clamped (moment-resisting) joints**
+If joints are glued or bolted rather than pinned, the bending stiffness of continuous
+members contributes to rigidity. A shell structure with moment-stiff joints can be
+stable without triangulation. This is how gridshell structures (Frei Otto) work.
+Requires much stiffer joints than typical dome connectors.
+
+**2. Two spiral families + rigid base ring**
+Two CW/CCW zone line families crossing at every face can stabilize the dome *if* the
+base perimeter is fixed (rigid ring or floor anchorage). The boundary condition converts
+the parallelogram mechanisms into a stable shell. Many tensile and thin-shell structures
+exploit this.
+
+**3. Three-way weave (most achievable with flat strips)**
+Add a third family of members at ~60° to the other two. The three-way crossing
+triangulates every panel and the over-under-over interlacing provides friction lock at
+intersections — no fasteners required. Traditional woven bamboo domes use exactly this.
+Each member stays approximately straight between crossings.
+
+### Flat-strip fabrication feasibility
+
+For a strip to follow a zone line without twisting, the zone line must lie in a plane
+(or close to one). Planarity depends on the surface type:
+
+| Surface | Zone line planarity | Flat strip achievable? |
+|---|---|---|
+| True cone | Exact (geodesic = straight line on unrolled sector) | Yes |
+| Sphere | Exact (great circle arcs are planar) | Yes |
+| Polar zonohedron (large N) | Approximate — deviation decreases with N | Possibly, with flexible material |
+| Polar zonohedron (small N) | Poor — significant torsion | No without steam-bending or kerf |
+
+**The conical route**: The phyllotaxis cone mode approximates a true cone. Zone lines
+on a cone are geodesics, which unroll to straight lines — perfectly achievable as flat
+strips after cutting from an unrolled sector pattern. The structural problem (two
+families don't fully triangulate) remains, but the fabrication problem is solved.
+
+**The gridshell route**: Lay a flat rectangular grid of strips, form it over a mold or
+erect it with temporary supports, then lock the joints. The pre-stressed bent form
+plus moment-stiff joints (epoxy, clamps) produces a shell without triangulation. The
+final geometry emerges from the forming process rather than being pre-determined.
+Frei Otto's Mannheim Multihalle (1975) is the canonical example.
+
+**The three-way weave route**: Three families of strips interlaced. Each strip is
+approximately a geodesic arc on the dome surface. For the zonohedron dome:
+- Family A: zone lines winding CW with step F₁
+- Family B: zone lines winding CCW with step F₂  
+- Family C: approximately horizontal (constant-height) members
+
+Family C members don't follow zone lines but provide the third triangulating direction.
+They could be short straight connectors between A/B intersections rather than continuous
+strips.
+
+### Visualizer additions
+
+- **Diagonal toggle**: show triangulating diagonals (short / long / alternating)
+- **Zone line display**: N continuous helical paths (see section 6)
+- **Planarity heatmap**: color zone line segments by out-of-plane deviation
+- **Weave preview**: show three-way crossing pattern on dome surface
+- **Unroll view**: for conical approximation, show flat unrolled strip shapes
+
+---
+
 ## Implementation Priority
 
 | Feature | Complexity | Value | Priority |
