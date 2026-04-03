@@ -231,7 +231,7 @@ body::before{
     <div class="toggle-row">
       <div>
         <div class="toggle-lbl">Variable elevation</div>
-        <div class="toggle-sub">φₖ = k × (90°/N)</div>
+        <div class="toggle-sub">φₖ = φ + φ/2 × sin(k × 2π/N)</div>
       </div>
       <label class="switch">
         <input type="checkbox" id="tog-varphi">
@@ -368,7 +368,8 @@ function buildGenerators(N, phi_deg, azMode, azAngle, varphi, varlen) {
 
     // Elevation angle
     let elev_deg = phi_deg;
-    if (varphi) elev_deg = (k + 1) * (90 / N);
+    // Sinusoidal variation around base φ — keeps elevation bounded and smooth
+    if (varphi) elev_deg = phi_deg + phi_deg * 0.5 * Math.sin(k * 2 * Math.PI / N);
     const elev = elev_deg * Math.PI / 180;
 
     // Generator length
