@@ -224,6 +224,16 @@ body::before{
       <input type="range" id="c-az" min="1" max="359" step="0.1" value="137.5">
     </div>
     <div style="font-size:8px;color:var(--t0);margin-top:6px;font-style:italic;line-height:1.6" id="az-note">360°/N — true rhombic zonohedron</div>
+
+    <!-- Generator position ring -->
+    <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+      <svg id="az-ring" width="72" height="72" style="flex-shrink:0"></svg>
+      <div>
+        <div class="sr" style="margin-bottom:4px"><span class="sl">distinct positions</span><span class="sv" id="az-distinct" style="color:var(--violet)">12</span></div>
+        <div class="sr" style="margin-bottom:4px"><span class="sl">min gap</span><span class="sv" id="az-gap" style="color:var(--teal)">30.0°</span></div>
+        <div style="font-size:8px;color:var(--t0);font-style:italic;line-height:1.5" id="az-alias"></div>
+      </div>
+    </div>
   </div>
 
   <div class="sec">
@@ -480,6 +490,73 @@ function buildZonohedron(g, scale, colMode, dome) {
   return { geo, centroids, fNormals };
 }
 
+// ─── Ring Diagram & Alias Detection ──────────────────────────────────────────
+
+function azPositions() {
+  const N = S.N;
+  const step = S.azMode === 'equal' ? 360 / N : S.azAngle;
+  return Array.from({length: N}, (_, k) => ((k * step) % 360 + 360) % 360);
+}
+
+function updateRingDiagram() {
+  const N = S.N;
+  const positions = azPositions();
+
+  const sorted = [...positions].sort((a, b) => a - b);
+  let minGap = Infinity;
+  for (let i = 0; i < N; i++) {
+    const gap = (sorted[(i + 1) % N] + 360 - sorted[i]) % 360;
+    if (gap > 0.01) minGap = Math.min(minGap, gap);
+  }
+  if (!isFinite(minGap)) minGap = 360 / N;
+
+  const distinct = new Set(positions.map(p => Math.round(p * 2) / 2)).size;
+
+  const aliasEl = document.getElementById('az-alias');
+  const gapEl   = document.getElementById('az-gap');
+  const distEl  = document.getElementById('az-distinct');
+  if (!aliasEl) return;
+
+  distEl.textContent = distinct;
+  distEl.style.color = distinct < N ? 'var(--gold)' : 'var(--violet)';
+
+  gapEl.textContent = minGap.toFixed(1) + '°';
+  gapEl.style.color = minGap < 5 ? 'var(--red)' : minGap < 15 ? 'var(--gold)' : 'var(--teal)';
+
+  if (distinct < N) {
+    aliasEl.textContent = `aliased → ${distinct}-fold symmetry`;
+    aliasEl.style.color = 'var(--gold)';
+  } else if (minGap < 5) {
+    aliasEl.textContent = 'near-degenerate — self-intersecting';
+    aliasEl.style.color = 'var(--red)';
+  } else {
+    aliasEl.textContent = '';
+  }
+
+  const svg = document.getElementById('az-ring');
+  const cx = 36, cy = 36, r = 28;
+  let html = `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#1a2030" stroke-width="1"/>`;
+  html += `<line x1="${cx}" y1="${cy - r + 5}" x2="${cx}" y2="${cy - r}" stroke="#252f45" stroke-width="1.5"/>`;
+
+  positions.forEach((ang, i) => {
+    const rad = (ang - 90) * Math.PI / 180;
+    const x = cx + r * Math.cos(rad);
+    const y = cy + r * Math.sin(rad);
+    const hue = Math.round((i / N) * 300);
+    html += `<circle cx="${x.toFixed(2)}" cy="${y.toFixed(2)}" r="2.8" fill="hsl(${hue},65%,55%)" opacity="0.85"/>`;
+  });
+
+  // Label first 3 dots to show winding order
+  [0, 1, 2].filter(i => i < N).forEach(i => {
+    const rad = (positions[i] - 90) * Math.PI / 180;
+    const x = cx + (r - 9) * Math.cos(rad);
+    const y = cy + (r - 9) * Math.sin(rad);
+    html += `<text x="${x.toFixed(1)}" y="${(y + 3).toFixed(1)}" font-size="6" fill="#9ba8bf" text-anchor="middle">${i}</text>`;
+  });
+
+  svg.innerHTML = html;
+}
+
 // ─── Rebuild Scene ────────────────────────────────────────────────────────────
 
 function rebuild() {
@@ -538,6 +615,7 @@ function rebuild() {
   updateHUD();
   updateLegend();
   checkRhombic();
+  updateRingDiagram();
 }
 
 // ─── Stats & UI Updates ───────────────────────────────────────────────────────
@@ -741,6 +819,7 @@ function initUI() {
     document.getElementById('az-note').textContent = AZ_NOTES[label || S.azMode] || '';
     document.getElementById('v-az').textContent = S.azAngle.toFixed(1) + '°';
     document.getElementById('c-az').value = S.azAngle;
+    updateRingDiagram();
   }
 
   document.querySelectorAll('[data-az]').forEach(btn =>
