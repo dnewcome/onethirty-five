@@ -150,8 +150,9 @@ body::before{
 
 <div id="hud">
   <div class="hl">N = <span class="hv" id="hud-n">12</span> generators</div>
-  <div class="hl">φ = <span class="hv" id="hud-phi">35.0°</span> elevation</div>
-  <div class="hl">faces = <span class="hv" id="hud-faces">132</span></div>
+  <div class="hl">φ = <span class="hv" id="hud-phi">30.0°</span> elevation</div>
+  <div class="hl">faces = <span class="hv" id="hud-faces">66</span></div>
+  <div class="hl">mode = <span class="hv" id="hud-form">dome</span></div>
 </div>
 
 <div id="legend">
@@ -171,8 +172,8 @@ body::before{
       <button class="fpick" data-n="3">3</button>
       <button class="fpick" data-n="5">5</button>
       <button class="fpick" data-n="8">8 fib</button>
-      <button class="fpick" data-n="12">12</button>
-      <button class="fpick active" data-n="13">13 fib</button>
+      <button class="fpick active" data-n="12">12</button>
+      <button class="fpick" data-n="13">13 fib</button>
       <button class="fpick" data-n="21">21 fib</button>
     </div>
     <div class="cr">
@@ -181,7 +182,7 @@ body::before{
     </div>
     <div class="cr">
       <div class="clr"><span class="cn">Elevation φ</span><span class="cv" id="v-phi">35.0°</span></div>
-      <input type="range" id="c-phi" min="5" max="85" step="0.5" value="35">
+      <input type="range" id="c-phi" min="5" max="85" step="0.5" value="30">
     </div>
     <div class="cr">
       <div class="clr"><span class="cn">Scale</span><span class="cv" id="v-scale">1.00</span></div>
@@ -191,6 +192,10 @@ body::before{
 
   <div class="sec">
     <div class="sec-lbl">Display</div>
+    <div class="bgrp" style="margin-bottom:6px">
+      <button class="tbtn active" data-form="dome">Dome</button>
+      <button class="tbtn" data-form="full">Full</button>
+    </div>
     <div class="bgrp" style="margin-bottom:10px">
       <button class="tbtn active" data-disp="solid">Solid</button>
       <button class="tbtn" data-disp="wire">Wire</button>
@@ -241,7 +246,8 @@ body::before{
     <div class="sec-lbl">Structure</div>
     <div class="statsbox" id="stats">
       <div class="sr"><span class="sl">generators</span><span class="sv" id="st-n">12</span></div>
-      <div class="sr"><span class="sl">faces (N²-N)</span><span class="sv" id="st-faces">132</span></div>
+      <div class="sr"><span class="sl">total faces (N²-N)</span><span class="sv" id="st-faces">132</span></div>
+      <div class="sr"><span class="sl">visible faces</span><span class="sv" id="st-vis">66</span></div>
       <div class="sr"><span class="sl">vertices (N²-N+2)</span><span class="sv" id="st-verts">134</span></div>
       <div class="sr"><span class="sl">zone bands</span><span class="sv" id="st-bands">11</span></div>
       <div class="sr"><span class="sl">faces per band</span><span class="sv" id="st-fpb">12</span></div>
@@ -266,8 +272,9 @@ import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 
 const S = {
   N: 12,
-  phi: 35,        // elevation in degrees
+  phi: 30,        // elevation in degrees
   scale: 1.0,
+  dome: true,     // dome (top half) | full zonohedron
   disp: 'solid',  // solid | wire | both
   col: 'zone',    // zone | depth | flat
   golden: false,
@@ -392,8 +399,11 @@ function zoneColor(k, N, colMode) {
 
 // ─── Geometry Builder ─────────────────────────────────────────────────────────
 
-function buildZonohedron(g, scale, colMode) {
+function buildZonohedron(g, scale, colMode, dome) {
   const N = g.length;
+
+  // In dome mode show only the upper half of zone bands
+  const kStart = dome ? Math.ceil(N / 2) : 1;
 
   // Center: half the vector sum of all generators
   const totalSum = new THREE.Vector3();
@@ -408,8 +418,7 @@ function buildZonohedron(g, scale, colMode) {
   const fNormals   = [];
 
   // Face_(i, k) = quad [V(i+1, k-1), V(i, k), V(i, k+1), V(i+1, k)]
-  // k = 1..N-1, i = 0..N-1
-  for (let k = 1; k <= N - 1; k++) {
+  for (let k = kStart; k <= N - 1; k++) {
     const fc = zoneColor(k, N, colMode);
 
     for (let i = 0; i < N; i++) {
@@ -442,6 +451,14 @@ function buildZonohedron(g, scale, colMode) {
     }
   }
 
+  // In dome mode, translate so the open base sits at y=0
+  if (dome && positions.length) {
+    let minY = Infinity;
+    for (let i = 1; i < positions.length; i += 3) minY = Math.min(minY, positions[i]);
+    for (let i = 1; i < positions.length; i += 3) positions[i] -= minY;
+    for (const c of centroids) c.y -= minY;
+  }
+
   const geo = new THREE.BufferGeometry();
   geo.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
   geo.setAttribute('normal',   new THREE.Float32BufferAttribute(normals_, 3));
@@ -461,9 +478,23 @@ function rebuild() {
   const { N, phi, scale, disp, col, golden, varphi, varlen } = S;
 
   generators = buildGenerators(N, phi, golden, varphi, varlen);
-  const { geo, centroids, fNormals: fN } = buildZonohedron(generators, scale, col);
+  const { geo, centroids, fNormals: fN } = buildZonohedron(generators, scale, col, S.dome);
   faceCentroids = centroids;
   faceNormals   = fN;
+
+  // Camera: dome sits on ground and you look at it from outside;
+  // full zonohedron is centred at origin
+  const domeH = (N / 2) * Math.sin(phi * Math.PI / 180) * scale;
+  if (S.dome) {
+    orbit.target.set(0, domeH * 0.45, 0);
+    camera.position.set(0, domeH * 0.7, domeH * 4.5);
+    grid.position.y = -0.05;
+  } else {
+    orbit.target.set(0, 0, 0);
+    camera.position.set(0, domeH * 0.4, domeH * 4.5);
+    grid.position.y = -(N / 2) * Math.sin(phi * Math.PI / 180) * scale - 0.5;
+  }
+  orbit.update();
 
   // Solid mesh
   if (disp === 'solid' || disp === 'both') {
@@ -501,12 +532,17 @@ function rebuild() {
 
 function updateStats() {
   const N = S.N;
+  const kStart = S.dome ? Math.ceil(N / 2) : 1;
+  const visibleBands = N - 1 - kStart + 1;
+  const visFaces = visibleBands * N;
   document.getElementById('st-n').textContent = N;
   document.getElementById('st-faces').textContent = N * (N - 1);
+  document.getElementById('st-vis').textContent = visFaces;
   document.getElementById('st-verts').textContent = N * (N - 1) + 2;
   document.getElementById('st-bands').textContent = N - 1;
   document.getElementById('st-fpb').textContent = N;
-  document.getElementById('hud-faces').textContent = N * (N - 1);
+  document.getElementById('hud-faces').textContent = visFaces;
+  document.getElementById('hud-form').textContent = S.dome ? 'dome' : 'full';
 }
 
 function checkRhombic() {
@@ -662,6 +698,15 @@ function initUI() {
     btn.addEventListener('click', () => {
       S.col = btn.dataset.col;
       document.querySelectorAll('[data-col]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      rebuild();
+    }));
+
+  // Dome / full
+  document.querySelectorAll('[data-form]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      S.dome = btn.dataset.form === 'dome';
+      document.querySelectorAll('[data-form]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       rebuild();
     }));
