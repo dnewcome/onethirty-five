@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Phyllotaxis Lab — Botanical Geometry System</title>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,300;0,400;0,500;0,600;1,300&display=swap" rel="stylesheet">
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"}}
+</script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0a0f;
+  --panel:#0c0d15;
+  --b1:#1a2030;
+  --b2:#252f45;
+  --t0:#3d4a60;
+  --t1:#6b7894;
+  --t2:#9ba8bf;
+  --gold:#d4a843;
+  --gold-d:#8a6c2a;
+  --teal:#4aeabc;
+  --teal-d:#1a5940;
+  --red:#e25c5c;
+  --pw:290px;
+  --mono:'IBM Plex Mono',monospace;
+}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:var(--mono);color:var(--t1)}
+#c{position:fixed;top:0;left:0;display:block}
+
+/* ── Panel ── */
+#panel{
+  position:fixed;top:0;right:0;
+  width:var(--pw);height:100vh;
+  background:var(--panel);
+  border-left:1px solid var(--b1);
+  overflow-y:auto;
+  display:flex;flex-direction:column;
+  scrollbar-width:thin;scrollbar-color:var(--b1) transparent;
+  z-index:10;
+}
+#panel::-webkit-scrollbar{width:3px}
+#panel::-webkit-scrollbar-thumb{background:var(--b1)}
+
+.ph{
+  padding:18px 18px 14px;
+  border-bottom:1px solid var(--b1);
+  flex-shrink:0;
+}
+.ph-title{font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--gold);font-weight:600}
+.ph-sub{font-size:9px;color:var(--t0);margin-top:4px;letter-spacing:.06em;font-style:italic}
+
+.sec{padding:14px 18px;border-bottom:1px solid var(--b1)}
+.sec-lbl{font-size:8px;letter-spacing:.22em;text-transform:uppercase;color:var(--t0);margin-bottom:10px;font-weight:500}
+
+/* presets */
+.presets{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.pbtn{
+  background:none;border:1px solid var(--b1);color:var(--t1);
+  font-family:var(--mono);font-size:9px;padding:7px 5px;
+  cursor:pointer;transition:all .12s;letter-spacing:.04em;text-align:center;
+}
+.pbtn:hover{border-color:var(--gold-d);color:var(--gold)}
+.pbtn.active{border-color:var(--gold);color:var(--gold);background:rgba(212,168,67,.08)}
+
+/* sliders */
+.cr{margin-bottom:12px}
+.cr:last-child{margin-bottom:0}
+.clr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.cn{font-size:9px;color:var(--t1);letter-spacing:.04em}
+.cv{font-size:9px;color:var(--teal);font-weight:500;min-width:42px;text-align:right}
+input[type=range]{
+  width:100%;height:2px;-webkit-appearance:none;appearance:none;
+  background:var(--b1);outline:none;cursor:pointer;display:block;
+}
+input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:9px;height:9px;
+  background:var(--gold);border-radius:50%;cursor:pointer;transition:transform .1s;
+}
+input[type=range]::-webkit-slider-thumb:hover{transform:scale(1.4)}
+input[type=range]::-moz-range-thumb{
+  width:9px;height:9px;background:var(--gold);border-radius:50%;border:none;cursor:pointer;
+}
+
+/* toggle buttons */
+.bgrp{display:flex;gap:3px}
+.tbtn{
+  flex:1;background:none;border:1px solid var(--b1);color:var(--t0);
+  font-family:var(--mono);font-size:8px;padding:6px 3px;
+  cursor:pointer;transition:all .12s;letter-spacing:.04em;text-transform:uppercase;
+}
+.tbtn:hover{border-color:var(--b2);color:var(--t1)}
+.tbtn.active{border-color:var(--gold-d);color:var(--gold);background:rgba(212,168,67,.07)}
+
+/* action buttons */
+.abtn{
+  width:100%;padding:9px 12px;background:none;border:1px solid var(--b1);
+  color:var(--t1);font-family:var(--mono);font-size:9px;cursor:pointer;
+  transition:all .12s;letter-spacing:.08em;text-transform:uppercase;
+  text-align:left;display:flex;align-items:center;gap:8px;margin-bottom:5px;
+}
+.abtn:last-child{margin-bottom:0}
+.abtn:hover{border-color:var(--teal-d);color:var(--teal);background:rgba(74,234,188,.04)}
+.abtn.primary{border-color:var(--gold-d);color:var(--gold)}
+.abtn.primary:hover{background:rgba(212,168,67,.08)}
+.dot{width:5px;height:5px;border-radius:50%;background:currentColor;flex-shrink:0}
+
+/* fib info */
+.fibbox{
+  margin-top:9px;padding:10px 12px;
+  background:rgba(74,234,188,.03);border:1px solid rgba(74,234,188,.08);
+}
+.fibrow{display:flex;justify-content:space-between;font-size:9px;margin-bottom:5px}
+.fibrow:last-child{margin-bottom:0}
+.fbl{color:var(--t0)}
+.fbv{font-weight:500}
+.fba1{color:var(--teal)}
+.fba2{color:var(--gold)}
+
+/* color inputs */
+.colinputs{display:flex;gap:6px;align-items:center;margin-top:8px}
+input[type=color]{
+  width:22px;height:22px;border:1px solid var(--b1);
+  padding:1px;cursor:pointer;background:none;border-radius:0;
+}
+
+/* checkbox */
+.cbrow{display:flex;align-items:center;gap:7px;cursor:pointer}
+.cbrow input[type=checkbox]{accent-color:var(--gold);width:11px;height:11px;cursor:pointer}
+.cblbl{font-size:9px;color:var(--t1);letter-spacing:.04em;cursor:pointer}
+
+/* HUD */
+#hud{
+  position:fixed;top:18px;left:18px;
+  pointer-events:none;z-index:5;
+}
+.hl{font-size:9px;color:var(--t0);letter-spacing:.1em;line-height:2}
+.hv{font-weight:500}
+.hv1{color:var(--gold)}
+.hv2{color:var(--teal)}
+
+/* progress */
+#prog{position:fixed;bottom:0;left:0;height:2px;background:var(--b1)}
+#progfill{height:100%;background:var(--gold);width:0;transition:width .08s linear}
+
+/* scanlines */
+body::after{
+  content:'';position:fixed;inset:0;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.025) 2px,rgba(0,0,0,.025) 4px);
+  pointer-events:none;z-index:50;
+}
+/* vignette */
+body::before{
+  content:'';position:fixed;inset:0;
+  background:radial-gradient(ellipse at center,transparent 35%,rgba(0,0,0,.55) 100%);
+  pointer-events:none;z-index:49;
+}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="hud">
+  <div class="hl">φ = <span class="hv hv1" id="hud-a">137.5°</span></div>
+  <div class="hl">N = <span class="hv hv1" id="hud-n">300</span></div>
+  <div class="hl">spirals: <span class="hv fba1" id="hud-f1">13</span> / <span class="hv fba2" id="hud-f2">21</span></div>
+</div>
+
+<div id="prog" style="width:calc(100vw - 290px)">
+  <div id="progfill"></div>
+</div>
+
+<aside id="panel">
+  <div class="ph">
+    <div class="ph-title">Phyllotaxis Lab</div>
+    <div class="ph-sub">golden spiral / botanical geometry</div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Presets</div>
+    <div class="presets">
+      <button class="pbtn" data-preset="sunflower">Sunflower</button>
+      <button class="pbtn active" data-preset="pinecone">Pinecone</button>
+      <button class="pbtn" data-preset="pineapple">Pineapple</button>
+      <button class="pbtn" data-preset="fern">Fern</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Core Parameters</div>
+    <div class="cr">
+      <div class="clr"><span class="cn">Golden angle</span><span class="cv" id="v-angle">137.5°</span></div>
+      <input type="range" id="c-angle" min="90" max="180" step="0.1" value="137.5">
+    </div>
+    <div class="cr">
+      <div class="clr"><span class="cn">Seed count (N)</span><span class="cv" id="v-n">300</span></div>
+      <input type="range" id="c-n" min="10" max="1000" step="5" value="300">
+    </div>
+    <div class="cr">
+      <div class="clr"><span class="cn">Radius scale</span><span class="cv" id="v-rad">0.60</span></div>
+      <input type="range" id="c-rad" min="0.05" max="4" step="0.05" value="0.6">
+    </div>
+    <div class="cr">
+      <div class="clr"><span class="cn">Height step</span><span class="cv" id="v-hstep">0.050</span></div>
+      <input type="range" id="c-hstep" min="0" max="0.35" step="0.005" value="0.05">
+    </div>
+    <div class="cr">
+      <div class="clr"><span class="cn">Cone taper</span><span class="cv" id="v-taper">0.85</span></div>
+      <input type="range" id="c-taper" min="0" max="2" step="0.05" value="0.85">
+    </div>
+    <div class="cr">
+      <div class="clr"><span class="cn">Seed size</span><span class="cv" id="v-size">0.38</span></div>
+      <input type="range" id="c-size" min="0.05" max="1.8" step="0.05" value="0.38">
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Shape Mode</div>
+    <div class="bgrp">
+      <button class="tbtn" data-mode="flat">Flat</button>
+      <button class="tbtn active" data-mode="cone">Cone</button>
+      <button class="tbtn" data-mode="cylinder">Cylinder</button>
+      <button class="tbtn" data-mode="fern">Fern</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Seed Geometry</div>
+    <div class="bgrp">
+      <button class="tbtn" data-shape="sphere">Sphere</button>
+      <button class="tbtn" data-shape="cone">Cone</button>
+      <button class="tbtn active" data-shape="box">Box</button>
+      <button class="tbtn" data-shape="tetra">Tetra</button>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Coloring</div>
+    <div class="bgrp" style="margin-bottom:9px">
+      <button class="tbtn" data-col="single">Single</button>
+      <button class="tbtn active" data-col="gradient">Gradient</button>
+      <button class="tbtn" data-col="rainbow">Rainbow</button>
+    </div>
+    <div class="colinputs" id="colinputs">
+      <input type="color" id="col1" value="#c8862a" title="Color A">
+      <input type="color" id="col2" value="#2a1208" title="Color B">
+      <span style="font-size:9px;color:var(--t0);margin-left:2px">A → B</span>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Fibonacci Overlay</div>
+    <label class="cbrow">
+      <input type="checkbox" id="show-fib" checked>
+      <span class="cblbl">Show spiral arms</span>
+    </label>
+    <div class="fibbox" id="fibbox">
+      <div class="fibrow"><span class="fbl">arm 1 (teal)</span><span class="fbv fba1" id="fib1">—</span></div>
+      <div class="fibrow"><span class="fbl">arm 2 (gold)</span><span class="fbv fba2" id="fib2">—</span></div>
+      <div class="fibrow"><span class="fbl">φ ratio F₂/F₁</span><span class="fbv fba2" id="fibr">—</span></div>
+    </div>
+  </div>
+
+  <div class="sec">
+    <div class="sec-lbl">Growth Animation</div>
+    <div class="cr" style="margin-bottom:12px">
+      <div class="clr"><span class="cn">Speed (seeds/sec)</span><span class="cv" id="v-spd">20</span></div>
+      <input type="range" id="c-spd" min="1" max="300" step="1" value="20">
+    </div>
+    <button class="abtn primary" id="btn-grow"><span class="dot"></span><span id="grow-lbl">Grow</span></button>
+    <button class="abtn" id="btn-pause"><span class="dot"></span><span id="pause-lbl">Pause</span></button>
+    <button class="abtn" id="btn-reset"><span class="dot"></span>Reset</button>
+  </div>
+</aside>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const MAX = 1000; // max instance capacity
+const PW  = 290;  // panel width
+
+// ─── State ────────────────────────────────────────────────────────────────────
+
+const S = {
+  angle: 137.5, n: 300, rad: 0.6, hstep: 0.05, taper: 0.85,
+  mode: 'cone', shape: 'box', size: 0.38,
+  col: 'gradient', col1: '#c8862a', col2: '#2a1208',
+  fib: true, spd: 20,
+};
+
+let growProg = 0, isGrowing = false, isPaused = false;
+let positions = []; // precomputed [{x,y,z,quat,scale}]
+
+// ─── ThreeJS ──────────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById('c');
+const W = () => window.innerWidth - PW;
+const H = () => window.innerHeight;
+
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.setSize(W(), H());
+renderer.setClearColor(0x0a0a0f);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.15;
+
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x0a0a0f, 0.006);
+
+const camera = new THREE.PerspectiveCamera(48, W() / H(), 0.1, 1000);
+camera.position.set(0, 9, 24);
+
+const orbit = new OrbitControls(camera, renderer.domElement);
+orbit.enableDamping = true;
+orbit.dampingFactor = 0.06;
+orbit.target.set(0, 6, 0);
+orbit.minDistance = 2;
+orbit.maxDistance = 120;
+orbit.update();
+
+// Lights
+scene.add(new THREE.AmbientLight(0x1a2040, 3));
+
+const sun = new THREE.DirectionalLight(0xfff8e8, 3.5);
+sun.position.set(12, 22, 8);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048, 2048);
+sun.shadow.camera.left = -25; sun.shadow.camera.right = 25;
+sun.shadow.camera.top = 35;   sun.shadow.camera.bottom = -5;
+sun.shadow.camera.near = 0.5; sun.shadow.camera.far = 80;
+scene.add(sun);
+
+const fill = new THREE.DirectionalLight(0x4060b0, 1.8);
+fill.position.set(-12, 4, -8);
+scene.add(fill);
+
+const rim = new THREE.DirectionalLight(0x40c090, 1.0);
+rim.position.set(0, -6, 18);
+scene.add(rim);
+
+// Subtle grid floor
+const gridHelper = new THREE.GridHelper(60, 30, 0x141c28, 0x0f1520);
+gridHelper.position.y = -0.5;
+scene.add(gridHelper);
+
+// Shared dummy for matrix ops
+const dummy = new THREE.Object3D();
+const clock = new THREE.Clock();
+
+// ─── Phyllotaxis Mesh ─────────────────────────────────────────────────────────
+
+let mesh = null;
+let fibGroup = null;
+
+function makeGeo(shape) {
+  switch (shape) {
+    case 'sphere': return new THREE.SphereGeometry(0.5, 9, 7);
+    case 'cone':   return new THREE.ConeGeometry(0.38, 0.82, 6);
+    case 'box':    return new THREE.BoxGeometry(0.72, 0.46, 0.56);
+    case 'tetra':  return new THREE.TetrahedronGeometry(0.56);
+    default:       return new THREE.BoxGeometry(0.72, 0.46, 0.56);
+  }
+}
+
+function rebuildMesh() {
+  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+
+  const geo = makeGeo(S.shape);
+  const mat = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.08 });
+
+  mesh = new THREE.InstancedMesh(geo, mat, MAX);
+  mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  mesh.count = S.n;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+
+  // Init all invisible
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  const gray = new THREE.Color(0.5, 0.5, 0.5);
+  for (let i = 0; i < MAX; i++) {
+    mesh.setMatrixAt(i, zero);
+    mesh.setColorAt(i, gray);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  mesh.instanceColor.needsUpdate = true;
+
+  scene.add(mesh);
+  recompute();
+}
+
+// ─── Position Computation ─────────────────────────────────────────────────────
+
+function computePositions() {
+  const { angle, n, rad, hstep, taper, mode } = S;
+  const rad_ = angle * Math.PI / 180;
+  const out = [];
+  const up = new THREE.Vector3(0, 1, 0);
+
+  for (let i = 0; i < n; i++) {
+    const a = i * rad_;
+    const t = n > 1 ? i / (n - 1) : 0;
+    let x, y, z, sc;
+
+    if (mode === 'flat') {
+      // Classic sunflower disk
+      const r = Math.sqrt(i + 1) * rad;
+      x = r * Math.cos(a); y = 0; z = r * Math.sin(a);
+      sc = 1.0;
+
+    } else if (mode === 'cone') {
+      // Pinecone: tip at top (i=0), base at bottom (i=n-1)
+      // Radius grows with sqrt then tapers to tip
+      const r = Math.sqrt(i + 1) * rad * Math.max(0.01, 1 - taper * t);
+      y = (1 - t) * (n - 1) * hstep; // tip high, base low
+      x = r * Math.cos(a); z = r * Math.sin(a);
+      // Scale peaks at ~35% along (widest part of pinecone)
+      sc = Math.max(0.12, Math.sin(Math.PI * Math.min(1, t * 2.5 + 0.05)));
+
+    } else if (mode === 'cylinder') {
+      // Pineapple: constant radius cylinder with taper at ends
+      const envelope = Math.sin(t * Math.PI * 0.92 + 0.07);
+      const r = rad * (0.55 + 0.45 * envelope);
+      y = i * hstep;
+      x = r * Math.cos(a); z = r * Math.sin(a);
+      sc = 0.65 + 0.35 * envelope;
+
+    } else {
+      // Fern: seeds fan out from a central stem, golden angle still governs spacing
+      // Creates a flat frond / fern-leaf shape
+      const r = Math.sqrt(i + 1) * rad * 0.52;
+      const mainH = t * (n - 1) * hstep;
+      const frondSpread = Math.sin(t * Math.PI * 0.94 + 0.03);
+      x = r * Math.cos(a) * 0.22; // strongly compressed → flat frond
+      y = mainH + r * Math.sin(a) * 0.12;
+      z = r * Math.sin(a) * frondSpread;
+      sc = Math.max(0.1, (1 - t * 0.6) * frondSpread * 0.9 + 0.1);
+    }
+
+    // Rotation: orient seed so Y-axis points radially outward
+    const outDir = new THREE.Vector3(x, 0, z);
+    const quat = new THREE.Quaternion();
+    if (outDir.lengthSq() > 0.0001) {
+      outDir.normalize();
+      quat.setFromUnitVectors(up, outDir);
+    }
+
+    out.push({ x, y, z, quat, sc });
+  }
+  return out;
+}
+
+// ─── Colors ───────────────────────────────────────────────────────────────────
+
+function applyColors() {
+  if (!mesh) return;
+  const { col, col1, col2, n } = S;
+  const c1 = new THREE.Color(col1);
+  const c2 = new THREE.Color(col2);
+  const { f1, f2 } = fibArms(n);
+  const tmp = new THREE.Color();
+
+  for (let i = 0; i < n; i++) {
+    const t = n > 1 ? i / (n - 1) : 0;
+    if (col === 'single')        tmp.copy(c1);
+    else if (col === 'gradient') tmp.copy(c1).lerp(c2, t);
+    else                         tmp.setHSL(t, 0.82, 0.48);
+
+    // Slight brightness boost on fibonacci arm seeds
+    if (i % f1 === 0 || i % f2 === 0) tmp.multiplyScalar(1.25);
+
+    mesh.setColorAt(i, tmp);
+  }
+  mesh.instanceColor.needsUpdate = true;
+}
+
+// ─── Matrix Update ────────────────────────────────────────────────────────────
+
+function easeOutBack(t) {
+  const c1 = 1.70158, c3 = c1 + 1;
+  return 1 + c3 * Math.pow(t - 1, 3) + c1 * Math.pow(t - 1, 2);
+}
+
+function updateMatrices(progress) {
+  if (!mesh || !positions.length) return;
+  const n = S.n;
+
+  for (let i = 0; i < n; i++) {
+    const p = positions[i];
+    const diff = progress - i;
+
+    let growScale;
+    if (diff <= 0)      growScale = 0;
+    else if (diff < 1)  growScale = Math.max(0, easeOutBack(diff));
+    else                growScale = 1;
+
+    if (growScale < 0.001) {
+      dummy.position.set(0, -9999, 0);
+      dummy.scale.setScalar(0.001);
+    } else {
+      dummy.position.set(p.x, p.y, p.z);
+      dummy.quaternion.copy(p.quat);
+      dummy.scale.setScalar(Math.max(0, p.sc * S.size * growScale));
+    }
+    dummy.updateMatrix();
+    mesh.setMatrixAt(i, dummy.matrix);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+
+  // Progress bar
+  document.getElementById('progfill').style.width =
+    `${Math.min(100, (progress / n) * 100).toFixed(1)}%`;
+}
+
+// ─── Fibonacci ────────────────────────────────────────────────────────────────
+
+function fibArms(N) {
+  const seq = [1, 1];
+  while (seq[seq.length - 1] < N * 2)
+    seq.push(seq[seq.length - 1] + seq[seq.length - 2]);
+  const sq = Math.sqrt(N);
+  let f1 = 1, f2 = 1;
+  for (let i = 0; i < seq.length - 1; i++) {
+    if (seq[i] <= sq) { f1 = seq[i]; f2 = seq[i + 1]; }
+    else break;
+  }
+  return { f1, f2 };
+}
+
+function buildFibLines() {
+  if (fibGroup) {
+    scene.remove(fibGroup);
+    fibGroup.children.forEach(c => { c.geometry.dispose(); c.material.dispose(); });
+    fibGroup = null;
+  }
+  if (!S.fib || positions.length < 2) return;
+
+  const { f1, f2 } = fibArms(S.n);
+  const N = positions.length;
+  fibGroup = new THREE.Group();
+
+  function makeLines(step, color, opacity) {
+    const pts = [];
+    for (let i = 0; i + step < N; i++) {
+      const a = positions[i], b = positions[i + step];
+      pts.push(new THREE.Vector3(a.x, a.y, a.z), new THREE.Vector3(b.x, b.y, b.z));
+    }
+    if (!pts.length) return null;
+    const geo = new THREE.BufferGeometry().setFromPoints(pts);
+    const mat = new THREE.LineBasicMaterial({ color, opacity, transparent: true });
+    return new THREE.LineSegments(geo, mat);
+  }
+
+  const l1 = makeLines(f1, 0x4aeabc, 0.13);
+  const l2 = makeLines(f2, 0xd4a843, 0.10);
+  if (l1) fibGroup.add(l1);
+  if (l2) fibGroup.add(l2);
+  scene.add(fibGroup);
+}
+
+function updateFibUI() {
+  const { f1, f2 } = fibArms(S.n);
+  document.getElementById('fib1').textContent = f1 + ' arms';
+  document.getElementById('fib2').textContent = f2 + ' arms';
+  document.getElementById('fibr').textContent = (f2 / f1).toFixed(5);
+  document.getElementById('hud-f1').textContent = f1;
+  document.getElementById('hud-f2').textContent = f2;
+}
+
+// ─── Recompute ────────────────────────────────────────────────────────────────
+
+function recompute() {
+  if (!mesh) return;
+  mesh.count = S.n;
+  positions = computePositions();
+  applyColors();
+  buildFibLines();
+  updateFibUI();
+  document.getElementById('hud-a').textContent = S.angle.toFixed(1) + '°';
+  document.getElementById('hud-n').textContent = S.n;
+
+  if (!isGrowing) {
+    growProg = S.n;
+    updateMatrices(growProg);
+  } else {
+    updateMatrices(growProg);
+  }
+}
+
+// ─── Growth ───────────────────────────────────────────────────────────────────
+
+function startGrow() {
+  growProg = 0;
+  isGrowing = true;
+  isPaused = false;
+  document.getElementById('grow-lbl').textContent = 'Growing…';
+  document.getElementById('pause-lbl').textContent = 'Pause';
+}
+
+function togglePause() {
+  if (!isGrowing) return;
+  isPaused = !isPaused;
+  document.getElementById('pause-lbl').textContent = isPaused ? 'Resume' : 'Pause';
+}
+
+function doReset() {
+  isGrowing = false; isPaused = false;
+  growProg = S.n;
+  updateMatrices(growProg);
+  document.getElementById('grow-lbl').textContent = 'Grow';
+  document.getElementById('pause-lbl').textContent = 'Pause';
+  document.getElementById('progfill').style.width = '100%';
+}
+
+// ─── Presets ──────────────────────────────────────────────────────────────────
+
+const PRESETS = {
+  sunflower: {
+    angle:137.5, n:550, rad:0.52, hstep:0, taper:0,
+    mode:'flat', shape:'sphere', size:0.28,
+    col:'rainbow', col1:'#ffcc44', col2:'#ff6022',
+    fib:true, spd:30,
+    cam:[0,28,4], look:[0,0,0],
+  },
+  pinecone: {
+    angle:137.5, n:300, rad:0.6, hstep:0.05, taper:0.85,
+    mode:'cone', shape:'box', size:0.38,
+    col:'gradient', col1:'#c8862a', col2:'#2a1208',
+    fib:true, spd:18,
+    cam:[12,10,20], look:[0,6,0],
+  },
+  pineapple: {
+    angle:137.5, n:220, rad:1.8, hstep:0.075, taper:0,
+    mode:'cylinder', shape:'box', size:0.52,
+    col:'gradient', col1:'#5da832', col2:'#1a4010',
+    fib:true, spd:18,
+    cam:[14,8,20], look:[0,8,0],
+  },
+  fern: {
+    angle:137.5, n:380, rad:1.4, hstep:0.04, taper:0,
+    mode:'fern', shape:'tetra', size:0.26,
+    col:'gradient', col1:'#68d840', col2:'#163810',
+    fib:false, spd:25,
+    cam:[10,8,18], look:[0,7,0],
+  },
+};
+
+// Camera lerp targets
+let camTo = new THREE.Vector3(0, 9, 24);
+let lookTo = new THREE.Vector3(0, 6, 0);
+let camLerp = 0;
+
+function applyPreset(name) {
+  const p = PRESETS[name];
+  if (!p) return;
+
+  // Apply state
+  Object.assign(S, { angle:p.angle, n:p.n, rad:p.rad, hstep:p.hstep,
+    taper:p.taper, mode:p.mode, shape:p.shape, size:p.size,
+    col:p.col, col1:p.col1, col2:p.col2, fib:p.fib, spd:p.spd });
+
+  // Camera target
+  camTo.set(...p.cam);
+  lookTo.set(...p.look);
+  camLerp = 1;
+
+  syncUI();
+
+  // Start growth then rebuild
+  isGrowing = true; isPaused = false; growProg = 0;
+  document.getElementById('grow-lbl').textContent = 'Growing…';
+  document.getElementById('pause-lbl').textContent = 'Pause';
+
+  // Rebuild if shape changed, else just recompute
+  rebuildMesh(); // always rebuild for clean state
+
+  document.querySelectorAll('.pbtn').forEach(b =>
+    b.classList.toggle('active', b.dataset.preset === name));
+}
+
+// ─── UI Sync ──────────────────────────────────────────────────────────────────
+
+function setSlider(id, val) {
+  const el = document.getElementById('c-' + id);
+  const dv = document.getElementById('v-' + id);
+  if (el) el.value = val;
+  if (dv) {
+    if (id === 'angle') dv.textContent = parseFloat(val).toFixed(1) + '°';
+    else if (id === 'n') dv.textContent = parseInt(val);
+    else dv.textContent = parseFloat(val).toFixed(id === 'spd' ? 0 : 2);
+  }
+}
+
+function syncUI() {
+  setSlider('angle', S.angle);
+  setSlider('n', S.n);
+  setSlider('rad', S.rad);
+  setSlider('hstep', S.hstep);
+  setSlider('taper', S.taper);
+  setSlider('size', S.size);
+  setSlider('spd', S.spd);
+
+  document.querySelectorAll('[data-mode]').forEach(b =>
+    b.classList.toggle('active', b.dataset.mode === S.mode));
+  document.querySelectorAll('[data-shape]').forEach(b =>
+    b.classList.toggle('active', b.dataset.shape === S.shape));
+  document.querySelectorAll('[data-col]').forEach(b =>
+    b.classList.toggle('active', b.dataset.col === S.col));
+
+  document.getElementById('col1').value = S.col1;
+  document.getElementById('col2').value = S.col2;
+  document.getElementById('show-fib').checked = S.fib;
+  updateColVis();
+}
+
+function updateColVis() {
+  const ci = document.getElementById('colinputs');
+  const show = S.col !== 'rainbow';
+  ci.style.opacity = show ? '1' : '0.3';
+  ci.style.pointerEvents = show ? 'auto' : 'none';
+}
+
+// ─── UI Events ────────────────────────────────────────────────────────────────
+
+function initUI() {
+  // Sliders
+  const sliders = [
+    ['angle', v => { S.angle = +v; recompute(); }],
+    ['n',     v => { S.n = +v|0; recompute(); }],
+    ['rad',   v => { S.rad = +v; recompute(); }],
+    ['hstep', v => { S.hstep = +v; recompute(); }],
+    ['taper', v => { S.taper = +v; recompute(); }],
+    ['size',  v => { S.size = +v; if (!isGrowing) updateMatrices(growProg); }],
+    ['spd',   v => { S.spd = +v; }],
+  ];
+  sliders.forEach(([id, fn]) => {
+    const el = document.getElementById('c-' + id);
+    const dv = document.getElementById('v-' + id);
+    if (!el) return;
+    el.addEventListener('input', () => {
+      if (dv) {
+        if (id === 'angle') dv.textContent = parseFloat(el.value).toFixed(1) + '°';
+        else if (id === 'n') dv.textContent = parseInt(el.value);
+        else dv.textContent = parseFloat(el.value).toFixed(id === 'spd' ? 0 : 2);
+      }
+      fn(el.value);
+    });
+  });
+
+  // Mode
+  document.querySelectorAll('[data-mode]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      S.mode = btn.dataset.mode;
+      document.querySelectorAll('[data-mode]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      recompute();
+    }));
+
+  // Shape
+  document.querySelectorAll('[data-shape]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      S.shape = btn.dataset.shape;
+      document.querySelectorAll('[data-shape]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      rebuildMesh();
+    }));
+
+  // Color mode
+  document.querySelectorAll('[data-col]').forEach(btn =>
+    btn.addEventListener('click', () => {
+      S.col = btn.dataset.col;
+      document.querySelectorAll('[data-col]').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      updateColVis();
+      applyColors();
+    }));
+
+  document.getElementById('col1').addEventListener('input', e => {
+    S.col1 = e.target.value; applyColors();
+  });
+  document.getElementById('col2').addEventListener('input', e => {
+    S.col2 = e.target.value; applyColors();
+  });
+
+  document.getElementById('show-fib').addEventListener('change', e => {
+    S.fib = e.target.checked;
+    buildFibLines();
+  });
+
+  document.querySelectorAll('.pbtn').forEach(btn =>
+    btn.addEventListener('click', () => applyPreset(btn.dataset.preset)));
+
+  document.getElementById('btn-grow').addEventListener('click', startGrow);
+  document.getElementById('btn-pause').addEventListener('click', togglePause);
+  document.getElementById('btn-reset').addEventListener('click', doReset);
+}
+
+// ─── Resize ───────────────────────────────────────────────────────────────────
+
+window.addEventListener('resize', () => {
+  renderer.setSize(W(), H());
+  camera.aspect = W() / H();
+  camera.updateProjectionMatrix();
+  document.getElementById('prog').style.width = `${W()}px`;
+});
+
+// ─── Main Loop ────────────────────────────────────────────────────────────────
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.1);
+
+  // Camera lerp
+  if (camLerp > 0) {
+    const f = 1 - Math.pow(0.04, dt);
+    camera.position.lerp(camTo, f);
+    orbit.target.lerp(lookTo, f);
+    camLerp -= dt;
+    if (camLerp <= 0) camLerp = 0;
+  }
+
+  // Growth
+  if (isGrowing && !isPaused) {
+    growProg = Math.min(S.n, growProg + S.spd * dt);
+    updateMatrices(growProg);
+    if (growProg >= S.n) {
+      isGrowing = false;
+      document.getElementById('grow-lbl').textContent = 'Regrow';
+    }
+  }
+
+  orbit.update();
+  renderer.render(scene, camera);
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+
+initUI();
+applyPreset('pinecone');
+animate();
+
+</script>
+</body>
+</html>
