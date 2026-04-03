@@ -315,10 +315,8 @@ const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.setSize(W(), H());
 renderer.setClearColor(0x0a0a0f);
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.1;
+renderer.shadowMap.enabled = false;
+renderer.toneMapping = THREE.NoToneMapping;
 
 const scene = new THREE.Scene();
 scene.fog = new THREE.FogExp2(0x0a0a0f, 0.005);
@@ -334,22 +332,17 @@ orbit.minDistance = 2;
 orbit.maxDistance = 80;
 orbit.update();
 
-// Lights
-scene.add(new THREE.AmbientLight(0x18203a, 4));
+// Lights — single neutral directional keeps face shading clean and unambiguous
+scene.add(new THREE.AmbientLight(0xffffff, 0.9));
 
-const sun = new THREE.DirectionalLight(0xfff6e0, 4);
-sun.position.set(10, 18, 8);
-sun.castShadow = true;
-sun.shadow.mapSize.set(2048, 2048);
+const sun = new THREE.DirectionalLight(0xffffff, 2.8);
+sun.position.set(8, 16, 6);
 scene.add(sun);
 
-const fill = new THREE.DirectionalLight(0x4050a0, 2);
-fill.position.set(-10, 4, -8);
-scene.add(fill);
-
-const rim = new THREE.DirectionalLight(0xa06de0, 1.2);
-rim.position.set(0, -8, 14);
-scene.add(rim);
+// Subtle back-fill to lift shadow sides — kept neutral so it doesn't add color banding
+const back = new THREE.DirectionalLight(0xffffff, 0.35);
+back.position.set(-6, 2, -8);
+scene.add(back);
 
 const grid = new THREE.GridHelper(60, 30, 0x141c28, 0x0f1520);
 grid.position.y = -6;
@@ -589,13 +582,12 @@ function rebuild() {
   if (disp === 'solid' || disp === 'both') {
     const mat = new THREE.MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.55,
-      metalness: 0.08,
+      roughness: 0.8,
+      metalness: 0.0,
+      flatShading: true,
       side: THREE.DoubleSide,
     });
     solidMesh = new THREE.Mesh(geo, mat);
-    solidMesh.castShadow = true;
-    solidMesh.receiveShadow = true;
     scene.add(solidMesh);
   }
 
