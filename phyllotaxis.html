@@ -214,6 +214,10 @@ body::before{
       <div class="clr"><span class="cn">Seed size</span><span class="cv" id="v-size">0.38</span></div>
       <input type="range" id="c-size" min="0.05" max="1.8" step="0.05" value="0.38">
     </div>
+    <div class="cr">
+      <div class="clr"><span class="cn">Scale envelope</span><span class="cv" id="v-envAmt">1.00</span></div>
+      <input type="range" id="c-envAmt" min="0" max="1" step="0.01" value="1">
+    </div>
   </div>
 
   <div class="sec">
@@ -300,7 +304,7 @@ const PW  = 290;  // panel width
 
 const S = {
   angle: 137.5, n: 300, rad: 0.6, hstep: 0.05, taper: 0.85,
-  mode: 'cone', shape: 'box', size: 0.38,
+  mode: 'cone', shape: 'box', size: 0.38, envAmt: 1.0,
   col: 'gradient', col1: '#c8862a', col2: '#2a1208',
   fib: true, spd: 20,
   customGeo: null,
@@ -337,7 +341,35 @@ orbit.dampingFactor = 0.06;
 orbit.target.set(0, 6, 0);
 orbit.minDistance = 2;
 orbit.maxDistance = 120;
+orbit.enableRotate = false; // model rotates instead; lights stay fixed
 orbit.update();
+
+// ─── Model drag-rotation ──────────────────────────────────────────────────────
+{
+  let dragging = false, lastX = 0, lastY = 0;
+  const SENS = 0.004;
+  const qTmp = new THREE.Quaternion();
+  const axX  = new THREE.Vector3(1, 0, 0);
+  const axY  = new THREE.Vector3(0, 1, 0);
+
+  renderer.domElement.addEventListener('pointerdown', e => {
+    if (e.button !== 0) return;
+    dragging = true; lastX = e.clientX; lastY = e.clientY;
+    renderer.domElement.setPointerCapture(e.pointerId);
+  });
+  renderer.domElement.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    const dx = e.clientX - lastX;
+    const dy = e.clientY - lastY;
+    lastX = e.clientX; lastY = e.clientY;
+    qTmp.setFromAxisAngle(axY, dx * SENS);
+    modelGroup.quaternion.premultiply(qTmp);
+    qTmp.setFromAxisAngle(axX, dy * SENS);
+    modelGroup.quaternion.premultiply(qTmp);
+  });
+  renderer.domElement.addEventListener('pointerup',  () => { dragging = false; });
+  renderer.domElement.addEventListener('pointerleave', () => { dragging = false; });
+}
 
 // Lights
 scene.add(new THREE.AmbientLight(0x1a2040, 3));
@@ -364,6 +396,10 @@ const gridHelper = new THREE.GridHelper(60, 30, 0x141c28, 0x0f1520);
 gridHelper.position.y = -0.5;
 scene.add(gridHelper);
 
+// Model group — rotated by drag; lights stay in world space
+const modelGroup = new THREE.Group();
+scene.add(modelGroup);
+
 // Shared dummy for matrix ops
 const dummy = new THREE.Object3D();
 const clock = new THREE.Clock();
@@ -385,7 +421,7 @@ function makeGeo(shape) {
 }
 
 function rebuildMesh() {
-  if (mesh) { scene.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
+  if (mesh) { modelGroup.remove(mesh); mesh.geometry.dispose(); mesh.material.dispose(); }
 
   const geo = makeGeo(S.shape);
   const mat = new THREE.MeshStandardMaterial({ roughness: 0.6, metalness: 0.08 });
@@ -406,7 +442,7 @@ function rebuildMesh() {
   mesh.instanceMatrix.needsUpdate = true;
   mesh.instanceColor.needsUpdate = true;
 
-  scene.add(mesh);
+  modelGroup.add(mesh);
   recompute();
 }
 
@@ -491,6 +527,9 @@ function computePositions() {
       z = r * Math.sin(a) * frondSpread;
       sc = Math.max(0.1, (1 - t * 0.6) * frondSpread * 0.9 + 0.1);
     }
+
+    // Blend envelope: 0 = uniform, 1 = full position-dependent scaling
+    sc = 1.0 + (sc - 1.0) * S.envAmt;
 
     // Rotation: orient seed so Y-axis points radially outward
     const outDir = new THREE.Vector3(x, 0, z);
@@ -584,7 +623,7 @@ function fibArms(N) {
 
 function buildFibLines() {
   if (fibGroup) {
-    scene.remove(fibGroup);
+    modelGroup.remove(fibGroup);
     fibGroup.children.forEach(c => { c.geometry.dispose(); c.material.dispose(); });
     fibGroup = null;
   }
@@ -610,7 +649,7 @@ function buildFibLines() {
   const l2 = makeLines(f2, 0xd4a843, 0.10);
   if (l1) fibGroup.add(l1);
   if (l2) fibGroup.add(l2);
-  scene.add(fibGroup);
+  modelGroup.add(fibGroup);
 }
 
 function updateFibUI() {
@@ -802,6 +841,7 @@ function syncUI() {
   setSlider('hstep', S.hstep);
   setSlider('taper', S.taper);
   setSlider('size', S.size);
+  setSlider('envAmt', S.envAmt);
   setSlider('spd', S.spd);
 
   document.querySelectorAll('[data-mode]').forEach(b =>
@@ -834,8 +874,9 @@ function initUI() {
     ['rad',   v => { S.rad = +v; recompute(); }],
     ['hstep', v => { S.hstep = +v; recompute(); }],
     ['taper', v => { S.taper = +v; recompute(); }],
-    ['size',  v => { S.size = +v; if (!isGrowing) updateMatrices(growProg); }],
-    ['spd',   v => { S.spd = +v; }],
+    ['size',   v => { S.size = +v; if (!isGrowing) updateMatrices(growProg); }],
+    ['envAmt', v => { S.envAmt = +v; recompute(); }],
+    ['spd',    v => { S.spd = +v; }],
   ];
   sliders.forEach(([id, fn]) => {
     const el = document.getElementById('c-' + id);
